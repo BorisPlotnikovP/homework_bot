@@ -70,7 +70,9 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
     except Exception as error:
-        logger.error('Произошел сбой при отправке сообщения в telegram: %s', error)
+        logger.error(
+            'Произошел сбой при отправке сообщения в telegram: %s', error
+        )
     else:
         logger.debug('Сообщение успешно отправленно в telegram')
 
@@ -82,9 +84,12 @@ def get_api_answer(timestamp):
             ENDPOINT, params={'from_date': timestamp}, headers=HEADERS
         )
     except Exception as error:
-        logger.error('Произошла ошибка во время выполнения запроса к API: %s', error)
+        logger.error(
+            'Произошла ошибка во время выполнения запроса к API: %s', error
+        )
         raise APIConnectionError(
-            'Произошла ошибка во время выполнения запроса к API. Проверьте логи приложения.'
+            'Произошла ошибка во время выполнения запроса к API. '
+            'Проверьте логи приложения.'
         )
     status_code = response.status_code
     if status_code != HTTPStatus.OK:
@@ -94,9 +99,11 @@ def get_api_answer(timestamp):
             'url': response.url,
             'elapsed_time': response.elapsed
         }
-        logger.error('Произошла ошибка во время выполнения запроса к API: %s', response_info)
+        logger.error('Произошла ошибка во время выполнения запроса к API: %s',
+                     response_info)
         raise APIConnectionError(
-            'Произошла ошибка во время выполнения запроса к API. Проверьте логи!'
+            'Произошла ошибка во время выполнения запроса к API. '
+            'Проверьте логи!'
         )
     return response.json()
 
@@ -105,17 +112,25 @@ def check_response(response):
     """Валидирует ответ API."""
     response_type = type(response)
     if response_type != dict:
-        logger.error('Тип данных ответа отличается от ожидаемого: dict, получен: %s', response_type)
-        raise TypeError('Тип данных ответа отличается от ожидаемого. Проверьте логи!')
+        logger.error('Тип данных ответа отличается от ожидаемого: dict, '
+                     'получен: %s', response_type)
+        raise TypeError('Тип данных ответа отличается от ожидаемого. '
+                        'Проверьте логи!')
     for key in ANSWER_KEYS:
         if key not in response:
             logger.error('Отсутствует необходимый ключ в ответе api %s', key)
-            raise ResponseKeyError('В ответе API отсутствует необходимый ключ. Проверьте логи.')
+            raise ResponseKeyError(
+                'В ответе API отсутствует необходимый ключ. '
+                'Проверьте логи.'
+            )
     homework_value = response.get(homework_key)
     answer_type = type(homework_value)
     if answer_type != list:
-        logger.error('Получен неожиданный тип данных ключа %s: %s', homework_key, answer_type)
-        raise TypeError('Тип данных домашней работы не соответствует ожидаемому.')
+        logger.error('Получен неожиданный тип данных ключа %s: %s',
+                     homework_key, answer_type)
+        raise TypeError(
+            'Тип данных домашней работы не соответствует ожидаемому.'
+        )
     if not homework_value:
         logger.debug('Получен пустой список домашних работ!')
 
@@ -124,19 +139,25 @@ def parse_status(homework):
     """Валидирует статус дз и возвращает строку с вердиктом."""
     for key in homework_name_key, status_key:
         if key not in homework:
-            logger.error('В полученной домашней работе отсутствует необходимый ключ: %s', key)
-            raise ResponseKeyError('В ответе API отсутствует необходимый ключ. Проверьте логи!')
+            logger.error('В полученной домашней работе отсутствует '
+                         'необходимый ключ: %s', key)
+            raise ResponseKeyError(
+                'В ответе API отсутствует необходимый ключ. Проверьте логи!'
+            )
     homework_status = homework[status_key]
     homework_name = homework[homework_name_key]
     if not homework_status or homework_status not in HOMEWORK_VERDICTS:
-        logger.error('Получен неожиданный статус домашней работы: %s', homework_status)
-        raise ResponseTypeError('Получен неожиданный статус домашней работы. Проверьте логи!')
+        logger.error(
+            'Получен неожиданный статус домашней работы: %s', homework_status
+        )
+        raise ResponseTypeError(
+            'Получен неожиданный статус домашней работы. Проверьте логи!'
+        )
     verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
-    
     """Основная логика работы бота."""
     empty_tokens = check_tokens()
     if empty_tokens:
@@ -164,11 +185,11 @@ def main():
                     send_message(bot, new_status)
                     current_status = new_status
                 else:
-                    logger.debug('Статус полученной домашней работы не был изменен.')
+                    logger.debug('Статус полученной домашней работы '
+                                 'не был изменен.')
                 timestamp = response.get('current_date')
         finally:
             time.sleep(RETRY_PERIOD)
-
 
 
 if __name__ == '__main__':
