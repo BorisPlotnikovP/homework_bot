@@ -1,17 +1,13 @@
-import logging.handlers
+from http import HTTPStatus
 import os
-import sys
 import requests
-
-from telebot import TeleBot
+import sys
+import time
+import logging.handlers
 
 from dotenv import load_dotenv
-
-import time
-
 import logging
-
-from http import HTTPStatus
+from telebot import TeleBot
 
 from exceptions import EnvironmentVariableError
 
@@ -43,16 +39,29 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+homework_key = 'homeworks'
+
+date_key = 'current_date'
+
+status_key = 'status'
+
+homework_name_key = 'homework_name'
+
+ANSWER_KEYS = [homework_key, date_key]
+
 
 def check_tokens():
     """Проверяет доступность переменных окруженияю."""
-    for var in TELEGRAM_CHAT_ID, TELEGRAM_TOKEN, PRACTICUM_TOKEN:
-        if not var:
-            logger.critical(
-                f'Отсутствует обязательная переменная окружения: {var}.'
-                f'Программа остановлена.',
-            )
-            raise EnvironmentVariableError()
+    TOKENS = {
+        'PRACTICUM_TOKEN': PRACTICUM_TOKEN,
+        'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
+        'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID
+    }
+    empty_tokens = []
+    for var in TOKENS:
+        if not TOKENS[var]:
+            empty_tokens.append(var)
+    return empty_tokens
 
 
 def send_message(bot, message):
@@ -60,9 +69,7 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
     except Exception as error:
-        logger.error(
-            f'Произошел сбой при отправке сообщения в telegram: {error}'
-        )
+        logger.error('Произошел сбой при отправке сообщения в telegram: %s', error)
     else:
         logger.debug('Сообщение успешно отправленно в telegram')
 
@@ -73,51 +80,74 @@ def get_api_answer(timestamp):
         response = requests.get(
             ENDPOINT, params={'from_date': timestamp}, headers=HEADERS
         )
-    except Exception:
-        logger.error('Произошла ошибка во время выполнения запроса к API')
+    except Exception as error:
+        logger.error('Произошла ошибка во время выполнения запроса к API: %s', error)
         raise ConnectionError(
-            'Произошла ошибка во время выполнения запроса к API'
+            'Произошла ошибка во время выполнения запроса к API. Проверьте логи приложения.'
         )
-    if response.status_code != HTTPStatus.OK:
-        logger.error('Произошла ошибка во время выполнения запроса к API')
+    status_code = response.status_code
+    if status_code != HTTPStatus.OK:
+        response_info = {
+            'status_code': status_code,
+            'headers': response.headers,
+            'url': response.url,
+            'elapsed_time': response.elapsed
+        }
+        logger.error('Произошла ошибка во время выполнения запроса к API: %s', response_info)
         raise ConnectionError(
-            'Произошла ошибка во время выполнения запроса к API'
+            'Произошла ошибка во время выполнения запроса к API. Проверьте логи!'
         )
-    formated_response = response.json()
-    return formated_response
+    return response.json()
 
 
 def check_response(response):
     """Валидирует ответ API."""
-    if not isinstance(response, dict):
-        raise TypeError
-    if 'homeworks' not in response:
-        logger.error('Отсутствуют необходимые ключи в ответе api!')
-        raise KeyError
-    if not isinstance(response.get('homeworks'), list):
-        logger.error('sdgjfdgkdjf')
-        raise TypeError
-    if not response.get('homework'):
+    response_type = type(response)
+    if response_type != dict:
+        logger.error('Тип данных ответа отличается от ожидаемого: dict, получен: %s', response_type)
+        raise TypeError('Тип данных ответа отличается от ожидаемого. Проверьте логи!')
+    for key in ANSWER_KEYS:
+        if key not in response:
+            logger.error('Отсутствует необходимый ключ в ответе api %s', key)
+            raise KeyError('В ответе API отсутствует необходимый ключ. Проверьте логи.')
+    homework_value = response.get(homework_key)
+    answer_type = type(homework_value)
+    if answer_type != list:
+        logger.error('Получен неожиданный тип данных ключа %s: %s', homework_key, answer_type)
+        raise TypeError('Тип данных домашней работы не соответствует ожидаемому.')
+    if not homework_value:
         logger.debug('Получен пустой список домашних работ!')
 
 
 def parse_status(homework):
     """Валидирует статус дз и возвращает строку с вердиктом."""
-    homework_name = homework.get('homework_name')
-    if not homework_name or 'status' not in homework:
-        raise TypeError
-    status = homework.get('status')
-    if not status or status not in HOMEWORK_VERDICTS:
-        raise TypeError
-    verdict = HOMEWORK_VERDICTS.get(status)
+    for key in homework_name_key, status_key:
+        if key not in homework:
+            logger.error('В полученной домашней работе отсутствует необходимый ключ: %s', key)
+            raise KeyError('В ответе API отсутствует необходимый ключ. Проверьте логи!')
+    homework_status = homework[status_key]
+    homework_name = homework[homework_name_key]
+    if not homework_status or homework_status not in HOMEWORK_VERDICTS:
+        logger.error('Получен неожиданный статус домашней работы: %s', homework_status)
+        raise TypeError('Получен неожиданный статус домашней работы. Проверьте логи!')
+    verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
+    
     """Основная логика работы бота."""
-    check_tokens()
+    empty_tokens = check_tokens()
+    if empty_tokens:
+        logger.critical(
+            'Отсутствуют необходимые переменные окружения: %s', empty_tokens
+        )
+        raise EnvironmentVariableError(
+            f'Отсутствуют необходимые переменные окружения: {empty_tokens}'
+        )
     bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
+    current_status = None
     while True:
         try:
             response = get_api_answer(timestamp)
@@ -129,10 +159,15 @@ def main():
             homeworks = response.get('homeworks')
             if homeworks:
                 new_status = parse_status(homeworks[INDEX])
-                send_message(bot, new_status)
+                if new_status != current_status:
+                    send_message(bot, new_status)
+                    current_status = new_status
+                else:
+                    logger.debug('Статус полученной домашней работы не был изменен.')
                 timestamp = response.get('current_date')
         finally:
             time.sleep(RETRY_PERIOD)
+
 
 
 if __name__ == '__main__':
