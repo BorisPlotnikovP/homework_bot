@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 import logging
 from telebot import TeleBot
 
-from exceptions import EnvironmentVariableError
+from exceptions import (EnvironmentVariableError, ResponseTypeError,
+                        ResponseKeyError, APIConnectionError)
 
 
 formatter = logging.Formatter('%(asctime)s | %(levelname)s | %(message)s')
@@ -82,7 +83,7 @@ def get_api_answer(timestamp):
         )
     except Exception as error:
         logger.error('Произошла ошибка во время выполнения запроса к API: %s', error)
-        raise ConnectionError(
+        raise APIConnectionError(
             'Произошла ошибка во время выполнения запроса к API. Проверьте логи приложения.'
         )
     status_code = response.status_code
@@ -94,7 +95,7 @@ def get_api_answer(timestamp):
             'elapsed_time': response.elapsed
         }
         logger.error('Произошла ошибка во время выполнения запроса к API: %s', response_info)
-        raise ConnectionError(
+        raise APIConnectionError(
             'Произошла ошибка во время выполнения запроса к API. Проверьте логи!'
         )
     return response.json()
@@ -109,7 +110,7 @@ def check_response(response):
     for key in ANSWER_KEYS:
         if key not in response:
             logger.error('Отсутствует необходимый ключ в ответе api %s', key)
-            raise KeyError('В ответе API отсутствует необходимый ключ. Проверьте логи.')
+            raise ResponseKeyError('В ответе API отсутствует необходимый ключ. Проверьте логи.')
     homework_value = response.get(homework_key)
     answer_type = type(homework_value)
     if answer_type != list:
@@ -124,12 +125,12 @@ def parse_status(homework):
     for key in homework_name_key, status_key:
         if key not in homework:
             logger.error('В полученной домашней работе отсутствует необходимый ключ: %s', key)
-            raise KeyError('В ответе API отсутствует необходимый ключ. Проверьте логи!')
+            raise ResponseKeyError('В ответе API отсутствует необходимый ключ. Проверьте логи!')
     homework_status = homework[status_key]
     homework_name = homework[homework_name_key]
     if not homework_status or homework_status not in HOMEWORK_VERDICTS:
         logger.error('Получен неожиданный статус домашней работы: %s', homework_status)
-        raise TypeError('Получен неожиданный статус домашней работы. Проверьте логи!')
+        raise ResponseTypeError('Получен неожиданный статус домашней работы. Проверьте логи!')
     verdict = HOMEWORK_VERDICTS[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
