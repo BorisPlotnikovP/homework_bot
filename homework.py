@@ -110,10 +110,9 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Валидирует ответ API."""
-    response_type = type(response)
-    if response_type != dict:
+    if isinstance(response, dict):
         logger.error('Тип данных ответа отличается от ожидаемого: dict, '
-                     'получен: %s', response_type)
+                     'получен: %s', type(response))
         raise TypeError('Тип данных ответа отличается от ожидаемого. '
                         'Проверьте логи!')
     for key in ANSWER_KEYS:
@@ -124,10 +123,9 @@ def check_response(response):
                 'Проверьте логи.'
             )
     homework_value = response.get(homework_key)
-    answer_type = type(homework_value)
-    if answer_type != list:
+    if not isinstance(homework_value, list):
         logger.error('Получен неожиданный тип данных ключа %s: %s',
-                     homework_key, answer_type)
+                     homework_key, type(homework_value))
         raise TypeError(
             'Тип данных домашней работы не соответствует ожидаемому.'
         )
