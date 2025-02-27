@@ -110,7 +110,7 @@ def get_api_answer(timestamp):
 
 def check_response(response):
     """Валидирует ответ API."""
-    if isinstance(response, dict):
+    if not isinstance(response, dict):
         logger.error('Тип данных ответа отличается от ожидаемого: dict, '
                      'получен: %s', type(response))
         raise TypeError('Тип данных ответа отличается от ожидаемого. '
